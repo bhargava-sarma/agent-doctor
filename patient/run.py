@@ -1,4 +1,4 @@
-"""Run the patient's test suite. Every case is one neatlogs trace, grouped by --session.
+"""Run the patient's test suite. Every case is one neatlogs trace in session "<--session>.<case id>".
 
     python -m patient.run --session exam-123 --out results.json
 """
@@ -13,7 +13,7 @@ from patient.cases import CASES, grade
 
 
 def run_case(case: dict, session: str) -> dict:
-    with neatlogs.trace(f"expense-audit:{case['id']}", session_id=session, case_id=case["id"]):
+    with neatlogs.trace(f"expense-audit:{case['id']}", session_id=f"{session}.{case['id']}", case_id=case["id"]):
         try:
             report = audit_expenses(case["receipts"])
             passed, reason = grade(report, case["expected"])

@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+import httpx
 import neatlogs
 
 from agent_doctor import ui
@@ -91,23 +92,28 @@ class Doctor:
         )
         exam = Exam(session, json.loads(out.read_text()))
         ui.step("Pulling traces from neatlogs")
-        exam.traces = self.api.session_traces(session, expected=len(exam.results))
+        by_case = self.api.case_traces(session, [r["id"] for r in exam.results])
+        exam.traces = [{**t, "case": case_id} for case_id, t in by_case.items()]
         ui.exam_table(exam)
         return exam
 
     def trace_evidence(self, exam: Exam) -> str:
-        """Export the failing runs' traces from neatlogs as the Doctor's primary evidence."""
-        by_case = {t.get("traceName", "").split(":", 1)[-1]: t for t in exam.traces}
+        """Rebuild the failing runs from their neatlogs spans: the Doctor's primary evidence."""
+        by_case = {t["case"]: t for t in exam.traces}
         sections = []
         for r in [r for r in exam.results if not r["passed"]][:MAX_TRACES_PER_ROUND]:
             trace = by_case.get(r["id"])
             if not trace:
                 sections.append(f"### case {r['id']}: no trace found in neatlogs")
                 continue
-            md = self.api.export_markdown(trace["traceId"])
-            if len(md) > MAX_TRACE_CHARS:
-                md = md[: MAX_TRACE_CHARS // 2] + "\n...[truncated]...\n" + md[-MAX_TRACE_CHARS // 2 :]
-            sections.append(f"### case {r['id']} - trace {trace['traceId']} (status {trace.get('status')})\n{md}")
+            try:
+                timeline = self.api.timeline(trace["traceId"])
+            except httpx.HTTPStatusError as e:
+                # Trace not finalized yet: fall back to the local traceback for this case.
+                timeline = f"(trace spans unavailable: HTTP {e.response.status_code})\n{r.get('traceback', '')}"
+            if len(timeline) > MAX_TRACE_CHARS:
+                timeline = timeline[: MAX_TRACE_CHARS // 2] + "\n...[truncated]...\n" + timeline[-MAX_TRACE_CHARS // 2 :]
+            sections.append(f"### case {r['id']} - trace {trace['traceId']} (status {trace.get('status')})\n{timeline}")
         return "\n\n".join(sections)
 
     # ---- diagnosis & treatment ---------------------------------------------------------------

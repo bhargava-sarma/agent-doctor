@@ -29,7 +29,7 @@ def round_header(n: int, total: int):
 
 
 def exam_table(exam):
-    by_case = {t.get("traceName", "").split(":", 1)[-1]: t for t in exam.traces}
+    by_case = {t["case"]: t for t in exam.traces}
     table = Table(show_edge=False, header_style="bold")
     for col in ("case", "result", "detail", "trace", "llm/tool calls"):
         table.add_column(col)
