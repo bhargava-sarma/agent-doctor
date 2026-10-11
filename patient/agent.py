@@ -38,5 +38,5 @@ def audit_expenses(receipts: str) -> dict:
 
 
 def parse_report(text: str) -> dict:
-    data = json.loads(text.strip().removeprefix("```json").removesuffix("```"))
-    return {"total": float(data["total"]), "violations": sorted(data["violations"])}
+    data = json.loads(text.strip().removeprefix("```json").removesuffix("```").strip())
+    return {"total": float(data["total_usd"]), "violations": sorted(data["violations"])}
