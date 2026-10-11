@@ -5,6 +5,7 @@
 import argparse
 import json
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 
 import neatlogs
 
@@ -37,7 +38,8 @@ def main():
 
     get_client()  # init neatlogs before the first trace opens, or that trace loses its root span
     cases = [c for c in CASES if not args.case or c["id"] == args.case]
-    results = [run_case(c, args.session) for c in cases]
+    with ThreadPoolExecutor(max_workers=len(cases)) as pool:  # each case is its own trace
+        results = list(pool.map(lambda c: run_case(c, args.session), cases))
     neatlogs.flush()
 
     for r in results:
