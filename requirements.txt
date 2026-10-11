@@ -2,3 +2,4 @@ neatlogs>=1.4.26
 openai>=1.0
 python-dotenv
 httpx
+rich
