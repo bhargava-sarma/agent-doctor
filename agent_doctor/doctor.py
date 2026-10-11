@@ -18,7 +18,7 @@ PATIENT_DIR = ROOT / "patient"
 # Ground truth and the test harness are off limits: the Doctor fixes the agent, not the exam.
 PROTECTED = {"patient/cases.py", "patient/run.py"}
 MAX_TRACE_CHARS = 7000
-MAX_TRACES_PER_ROUND = 3
+MAX_TRACES_PER_ROUND = 4
 
 DOCTOR_PROMPT = """You are Agent Doctor, an expert at debugging LLM agents from their execution traces.
 

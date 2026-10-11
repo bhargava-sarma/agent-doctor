@@ -48,22 +48,25 @@ class NeatlogsAPI:
                 return found
             time.sleep(3)
 
-    def spans(self, trace_id: str) -> list[dict]:
-        spans = self._get(f"/traces/{trace_id}/spans", limit=50)["spans"]
+    def raw_spans(self, trace_id: str) -> list[dict]:
+        """All spans with input/output/error previews in one call (per-span payloads are limited to 10/min)."""
+        spans = self._get(f"/traces/{trace_id}/raw-spans", limit=50)["spans"]
         return sorted(spans, key=lambda s: s["startedAt"])
-
-    def payload(self, trace_id: str, span_id: str) -> dict:
-        fields = self._get(f"/traces/{trace_id}/spans/{span_id}/payload", fields="error,input,output")["fields"]
-        return {k: v["value"] for k, v in fields.items() if v.get("available")}
 
     def timeline(self, trace_id: str, max_field: int = 600) -> str:
         """Step-by-step account of a trace: every span with its inputs, outputs and errors."""
-        lines = []
-        for i, s in enumerate(self.spans(trace_id), 1):
+        lines, seen_llm_input = [], False
+        for i, s in enumerate(self.raw_spans(trace_id), 1):
             lines.append(f"{i}. [{s['spanType']}] {s['spanName']} status={s['status']} {s.get('durationMs') or 0:.0f}ms")
-            if s["spanType"] in ("TOOL", "AGENT", "LLM") or s["status"] != "OK":
-                for key, value in self.payload(trace_id, s["spanId"]).items():
-                    if s["spanType"] == "LLM" and key == "input":
-                        value = value[-max_field:]  # conversation so far; the tail is what's new
-                    lines.append(f"   {key}: {str(value)[:max_field]}")
+            for key in ("input", "output"):
+                value = (s.get(key) or {}).get("preview")
+                if s["spanType"] == "LLM" and key == "input":
+                    # Each LLM input repeats the whole conversation; tool spans already show what's new.
+                    if seen_llm_input:
+                        continue
+                    seen_llm_input = True
+                if value:
+                    lines.append(f"   {key}: {value[:max_field]}")
+            if (error := s.get("error")) and error.get("type"):
+                lines.append(f"   error: {error['type']}: {error.get('messagePreview')}")
         return "\n".join(lines)
