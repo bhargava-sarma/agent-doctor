@@ -69,7 +69,7 @@ TOOL_SCHEMAS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "category": {"type": "string", "enum": ["meal", "hotel", "taxi"]},
+                    "category": {"type": "string", "enum": ["meals", "lodging", "transport"]},
                     "amount_usd": {"type": "number"},
                 },
                 "required": ["category", "amount_usd"],
