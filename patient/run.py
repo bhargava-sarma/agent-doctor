@@ -8,6 +8,7 @@ import traceback
 
 import neatlogs
 
+from agent_doctor.llm import get_client
 from patient.agent import audit_expenses
 from patient.cases import CASES, grade
 
@@ -34,6 +35,7 @@ def main():
     parser.add_argument("--case", help="run a single case id")
     args = parser.parse_args()
 
+    get_client()  # init neatlogs before the first trace opens, or that trace loses its root span
     cases = [c for c in CASES if not args.case or c["id"] == args.case]
     results = [run_case(c, args.session) for c in cases]
     neatlogs.flush()

@@ -30,14 +30,37 @@ arguments or error that proves it. Fix the agent's code, never the tests. Prefer
 change that fixes the root cause. Failures can be layered: a crash may hide a logic bug that only
 shows once the crash is fixed, so fix what the evidence supports and keep tool contracts consistent.
 
-Reply with ONLY a JSON object:
-{
-  "diagnosis": "<one-line headline of the bug>",
-  "root_cause": "<2-4 sentences explaining why the agent fails>",
-  "evidence": ["<quote or fact from a trace>", ...],
-  "edits": [{"file": "patient/<file>.py", "find": "<exact unique snippet>", "replace": "<new snippet>"}]
+Submit your treatment plan by calling the prescribe tool. Each edit's "find" must match the
+current file exactly once, including whitespace."""
+
+PRESCRIBE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "prescribe",
+        "description": "Submit the diagnosis and the code edits that fix it.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "diagnosis": {"type": "string", "description": "One-line headline of the bug"},
+                "root_cause": {"type": "string", "description": "2-4 sentences explaining why the agent fails"},
+                "evidence": {"type": "array", "items": {"type": "string"}, "description": "Quotes or facts from the traces"},
+                "edits": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "file": {"type": "string", "description": "e.g. patient/tools.py"},
+                            "find": {"type": "string", "description": "Exact snippet that occurs once in the file"},
+                            "replace": {"type": "string"},
+                        },
+                        "required": ["file", "find", "replace"],
+                    },
+                },
+            },
+            "required": ["diagnosis", "root_cause", "evidence", "edits"],
+        },
+    },
 }
-Each "find" must match the current file exactly once, including whitespace."""
 
 
 @dataclass
@@ -135,11 +158,11 @@ class Doctor:
         response = self.client.chat.completions.create(
             model=DOCTOR_MODEL,
             messages=[{"role": "system", "content": DOCTOR_PROMPT}, {"role": "user", "content": user}],
+            tools=[PRESCRIBE_TOOL],
+            tool_choice={"type": "function", "function": {"name": "prescribe"}},
             max_tokens=4000,
         )
-        text = response.choices[0].message.content.strip()
-        text = text[text.find("{") : text.rfind("}") + 1]
-        plan = json.loads(text)
+        plan = json.loads(response.choices[0].message.tool_calls[0].function.arguments)
         ui.diagnosis(plan)
         return plan
 
@@ -189,7 +212,7 @@ class Doctor:
             try:
                 plan = self.diagnose(current)
                 files = self.apply(plan["edits"])
-            except (ValueError, KeyError, json.JSONDecodeError) as e:
+            except (ValueError, KeyError, IndexError, TypeError) as e:
                 ui.warn(f"Treatment plan unusable: {e}")
                 self.history.append({"round": round_no, "error": str(e)})
                 continue
@@ -200,7 +223,7 @@ class Doctor:
                 "before": f"{current.passed}/{len(current.results)}", "after": f"{after.passed}/{len(after.results)}",
                 "after_failures": [r["reason"] for r in after.results if not r["passed"]],
             }
-            if after.score > current.score:
+            if improved(current, after):
                 self.commit(plan, files, current, after)
                 ui.ok(f"Improvement verified in traces: {outcome['before']} -> {outcome['after']}. Committed.")
                 outcome["kept"] = True
@@ -264,6 +287,19 @@ class Doctor:
             cwd=ROOT, capture_output=True, text=True,
         )
         ui.ok(f"Pull request: {pr.stdout.strip()}" if pr.returncode == 0 else f"PR failed: {pr.stderr.strip()}")
+
+
+def improved(before: Exam, after: Exam) -> bool:
+    """Better score, or the old failures are gone without losing any passing case.
+
+    Bugs are often layered: fixing a crash can expose the next bug in the same cases, so the
+    pass count stays flat even though the treatment worked.
+    """
+    if after.score > before.score:
+        return True
+    old = {r["reason"] for r in before.results if not r["passed"]}
+    new = {r["reason"] for r in after.results if not r["passed"]}
+    return after.passed >= before.passed and not old & new
 
 
 def git(args: list[str]) -> str:
