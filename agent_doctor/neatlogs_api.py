@@ -34,7 +34,7 @@ class NeatlogsAPI:
             resp.raise_for_status()
             return resp.json()["data"]
 
-    def case_traces(self, session: str, case_ids: list[str], wait_s: int = 60) -> dict[str, dict]:
+    def case_traces(self, session: str, case_ids: list[str], wait_s: int = 90) -> dict[str, dict]:
         """Map each test case to its trace (session "<session>.<case id>"), polling until ingested."""
         found: dict[str, dict] = {}
         deadline = time.time() + wait_s

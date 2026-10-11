@@ -225,7 +225,11 @@ class Doctor:
             }
             if improved(current, after):
                 self.commit(plan, files, current, after)
-                ui.ok(f"Improvement verified in traces: {outcome['before']} -> {outcome['after']}. Committed.")
+                if after.passed == current.passed:
+                    outcome["note"] = "original failure cleared, deeper bug exposed"
+                    ui.ok(f"Original failure cleared; a deeper bug is now exposed ({outcome['after']}). Committed.")
+                else:
+                    ui.ok(f"Improvement verified in traces: {outcome['before']} -> {outcome['after']}. Committed.")
                 outcome["kept"] = True
                 current = after
             else:
@@ -268,7 +272,8 @@ class Doctor:
                 lines.append(f"- Round {h['round']}: plan rejected ({h['error']})")
             else:
                 verdict = "kept" if h["kept"] else "reverted"
-                lines.append(f"- Round {h['round']}: **{h['diagnosis']}** ({h['before']} -> {h['after']}, {verdict})")
+                note = f"; {h['note']}" if h.get("note") else ""
+                lines.append(f"- Round {h['round']}: **{h['diagnosis']}** ({h['before']} -> {h['after']}, {verdict}{note})")
         path = ROOT / "reports" / f"heal-{self.stamp}.md"
         path.parent.mkdir(exist_ok=True)
         path.write_text("\n".join(lines) + "\n")
