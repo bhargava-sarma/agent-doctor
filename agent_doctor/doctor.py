@@ -116,7 +116,9 @@ class Doctor:
         )
         exam = Exam(session, json.loads(out.read_text()))
         ui.step("Pulling traces from neatlogs")
-        by_case = self.api.case_traces(session, [r["id"] for r in exam.results], since)
+        # Failing runs' traces are evidence worth waiting for; passing ones are only displayed.
+        wait_s = 90 if exam.passed < len(exam.results) else 20
+        by_case = self.api.case_traces(session, [r["id"] for r in exam.results], since, wait_s)
         exam.traces = [{**t, "case": case_id} for case_id, t in by_case.items()]
         ui.exam_table(exam)
         return exam
