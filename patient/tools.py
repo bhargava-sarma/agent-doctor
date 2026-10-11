@@ -11,7 +11,7 @@ POLICY_LIMITS_USD = {"meals": 75.0, "lodging": 200.0, "transport": 60.0}
 @neatlogs.span(kind="TOOL")
 def get_exchange_rate(currency: str) -> float:
     """Multiplier that converts an amount in `currency` into USD."""
-    return USD_RATES[currency.upper()]
+    return round(1.0 / USD_RATES[currency.upper()], 6)
 
 
 @neatlogs.span(kind="TOOL")
@@ -69,7 +69,7 @@ TOOL_SCHEMAS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "category": {"type": "string", "enum": ["meal", "hotel", "taxi"]},
+                    "category": {"type": "string", "enum": ["meals", "lodging", "transport"]},
                     "amount_usd": {"type": "number"},
                 },
                 "required": ["category", "amount_usd"],
