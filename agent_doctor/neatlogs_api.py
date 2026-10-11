@@ -34,16 +34,25 @@ class NeatlogsAPI:
             resp.raise_for_status()
             return resp.json()["data"]
 
-    def case_traces(self, session: str, case_ids: list[str], wait_s: int = 90) -> dict[str, dict]:
-        """Map each test case to its trace (session "<session>.<case id>"), polling until ingested."""
+    def case_traces(self, session: str, case_ids: list[str], since: str, wait_s: int = 90) -> dict[str, dict]:
+        """Map each test case to its trace (session "<session>.<case id>"), polling until ingested.
+
+        Lists traces started since the exam began and matches sessions client-side: the
+        sessionId filter can lag behind ingestion.
+        """
+        wanted = {f"{session}.{case_id}": case_id for case_id in case_ids}
         found: dict[str, dict] = {}
         deadline = time.time() + wait_s
         while True:
-            for case_id in case_ids:
-                if case_id not in found:
-                    traces = self._get("/traces", sessionId=f"{session}.{case_id}", limit=1)["traces"]
-                    if traces:
-                        found[case_id] = traces[0]
+            cursor = None
+            while True:
+                page = self._get("/traces", limit=50, cursor=cursor, **{"from": since})
+                for t in page["traces"]:
+                    if (case_id := wanted.get(t.get("sessionId"))) and case_id not in found:
+                        found[case_id] = t
+                cursor = page["page"].get("nextCursor")
+                if not page["page"].get("hasMore") or not cursor:
+                    break
             if len(found) == len(case_ids) or time.time() > deadline:
                 return found
             time.sleep(3)

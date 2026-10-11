@@ -4,7 +4,7 @@ import subprocess
 import sys
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -109,13 +109,14 @@ class Doctor:
         session = f"exam-{self.stamp}-{label}-{uuid.uuid4().hex[:4]}"
         out = self.run_dir / f"{label}.json"
         ui.step(f"Examining patient  [dim](session {session})[/]")
+        since = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
         subprocess.run(
             [sys.executable, "-m", "patient.run", "--session", session, "--out", str(out)],
             cwd=ROOT, capture_output=True, text=True, timeout=900,
         )
         exam = Exam(session, json.loads(out.read_text()))
         ui.step("Pulling traces from neatlogs")
-        by_case = self.api.case_traces(session, [r["id"] for r in exam.results])
+        by_case = self.api.case_traces(session, [r["id"] for r in exam.results], since)
         exam.traces = [{**t, "case": case_id} for case_id, t in by_case.items()]
         ui.exam_table(exam)
         return exam
