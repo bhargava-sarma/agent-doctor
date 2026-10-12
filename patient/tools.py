@@ -1,8 +1,8 @@
 """Tools for the expense-auditor agent."""
 import neatlogs
 
-# How many units of each currency one US dollar buys.
-USD_RATES = {"USD": 1.0, "INR": 83.0, "EUR": 0.92, "GBP": 0.79, "JPY": 150.0}
+# How many US dollars one unit of each currency buys.
+USD_RATES = {"USD": 1.0, "INR": round(1/83.0, 6), "EUR": round(1/0.92, 6), "GBP": round(1/0.79, 6), "JPY": round(1/150.0, 6)}
 
 # Per-item reimbursement limits in USD.
 POLICY_LIMITS_USD = {"meals": 75.0, "lodging": 200.0, "transport": 60.0}
@@ -69,7 +69,7 @@ TOOL_SCHEMAS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "category": {"type": "string", "enum": ["meal", "hotel", "taxi"]},
+                    "category": {"type": "string", "enum": ["meals", "lodging", "transport"]},
                     "amount_usd": {"type": "number"},
                 },
                 "required": ["category", "amount_usd"],
